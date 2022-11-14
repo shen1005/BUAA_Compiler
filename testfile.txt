@@ -1,0 +1,14 @@
+int a() {
+    printf("left ");
+    return 1;
+}
+int b() {
+    printf("right ");
+    return 1;
+}
+int main() {
+    if( a() || b()) {
+        printf("main");
+    }
+    return 0;
+}

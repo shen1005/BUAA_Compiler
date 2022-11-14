@@ -1,0 +1,2 @@
+SymbolTerm{name='T_1A', type='int', value=0, dim=0, length1=0, length2=0, length1Value=[], length2Value=[], line=0, size=4, offset_sp=4, offset_gp=0}
+SymbolTerm{name='T_2A', type='int', value=0, dim=0, length1=0, length2=0, length1Value=[], length2Value=[], line=0, size=4, offset_sp=8, offset_gp=0}

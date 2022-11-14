@@ -1,0 +1,22 @@
+FUNC_DEC  a
+PRINT_STRING  null
+RET_VALUE null
+FUNC_DEC  b
+PRINT_STRING  null
+RET_VALUE null
+FUNC_DEC  main
+PRE_CALL  a
+CALL a
+FIN_CALL a
+SW_RET null
+BNEZ T_1A Label_1
+PUT_LABEL Label_3
+PRE_CALL  b
+CALL b
+FIN_CALL b
+SW_RET null
+BEQZ T_2A Label_2
+PUT_LABEL Label_1
+PRINT_STRING  null
+PUT_LABEL Label_2
+EXIT null

@@ -1,0 +1,91 @@
+.data 0x10000000
+#####global start#####
+#####global end#####
+#####str start#####
+Str_1: .asciiz "left "
+Str_2: .asciiz "right "
+Str_3: .asciiz "main"
+#####str end#####
+.text
+subiu $sp,$sp,8
+j main
+###### FUNC_DEC  a ######
+a :
+###### PRINT_STRING  null ######
+li $v0, 4
+la $a0, Str_1
+syscall
+
+###### RET_VALUE null ######
+li $t1, 1
+move $v0, $t1
+jr $ra
+
+###### FUNC_DEC  b ######
+b :
+###### PRINT_STRING  null ######
+li $v0, 4
+la $a0, Str_2
+syscall
+
+###### RET_VALUE null ######
+li $t1, 1
+move $v0, $t1
+jr $ra
+
+###### FUNC_DEC  main ######
+main :
+###### PRE_CALL  a ######
+sw $ra, 0($sp)
+subiu $sp,$sp,4
+
+###### CALL a ######
+jal a
+
+###### FIN_CALL a ######
+addiu $sp,$sp,4
+lw $ra, 0($sp)
+
+###### SW_RET null ######
+sw $v0, 4($sp)
+
+###### BNEZ T_1A Label_1 ######
+lw $t0, 4($sp)
+bnez $t0, Label_1
+
+###### PUT_LABEL Label_3 ######
+Label_3:
+
+###### PRE_CALL  b ######
+sw $ra, 0($sp)
+subiu $sp,$sp,4
+
+###### CALL b ######
+jal b
+
+###### FIN_CALL b ######
+addiu $sp,$sp,4
+lw $ra, 0($sp)
+
+###### SW_RET null ######
+sw $v0, 8($sp)
+
+###### BEQZ T_2A Label_2 ######
+lw $t0, 8($sp)
+beqz $t0, Label_2
+
+###### PUT_LABEL Label_1 ######
+Label_1:
+
+###### PRINT_STRING  null ######
+li $v0, 4
+la $a0, Str_3
+syscall
+
+###### PUT_LABEL Label_2 ######
+Label_2:
+
+###### EXIT null ######
+li $v0, 10
+syscall
+
