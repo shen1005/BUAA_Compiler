@@ -17,6 +17,8 @@ public class SymbolTerm {
     private int size;
     private int offset_sp = 4;
     private int offset_gp = 0;
+    private boolean isConst = false;
+    private boolean isParam = false;
 
     public SymbolTerm(String name, int dim, int length1, ArrayList<Integer> length1Value) {
         this.name = name;
@@ -157,6 +159,32 @@ public class SymbolTerm {
                 ", size=" + size +
                 ", offset_sp=" + offset_sp +
                 ", offset_gp=" + offset_gp +
+                ", isConst=" + isConst +
+                ", isParam=" + isParam +
                 '}';
+    }
+
+    public void setConst(boolean isConst) {
+        this.isConst = isConst;
+    }
+
+    public boolean getIsConst() {
+        return isConst;
+    }
+
+    public void setParam() {
+        isParam = true;
+    }
+
+    public boolean getIsParam() {
+        return isParam;
+    }
+
+    public String getRealName() {
+        if (name.charAt(name.length() - 1) == 'A') {
+            return name;
+        } else {
+            return name + "_" + line;
+        }
     }
 }

@@ -69,4 +69,8 @@ public class CodeManager {
         }
         return "Label" + "_" + label_num;
     }
+
+    public void setMidCodeList(ArrayList<MidCodeTerm> midCodeList) {
+        this.midCodeList = midCodeList;
+    }
 }

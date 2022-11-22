@@ -5,6 +5,7 @@ import Node.NonLeafNode;
 import Node.ErrorAnalysis;
 import Node.SymbolTable;
 import Node.*;
+import Optimize.Optimizer;
 import Type.OpType;
 
 import java.util.ArrayList;
@@ -104,6 +105,7 @@ public class Visitor {
             int value = ((NonLeafNode)node.getChild(index).getChild(0)).getConstExpValue(currentTable);
             SymbolTerm symbolTerm = new SymbolTerm(name, dim, value);
             symbolTerm.setLine(isGlobal ? -1 : node.getChild(0).getLine());
+            symbolTerm.setConst(true);
             symbolTerm.setSize(false);
             if (isGlobal) {
                 symbolTerm.setAddressGp();
@@ -120,6 +122,7 @@ public class Visitor {
             ArrayList<Integer> length1Value = ((NonLeafNode) node.getChild(index)).get1DValue(currentTable);
             SymbolTerm symbolTerm = new SymbolTerm(name, 1, length1D, length1Value);
             symbolTerm.setLine(isGlobal ? -1 : node.getChild(0).getLine());
+            symbolTerm.setConst(true);
             symbolTerm.setSize(false);
             if (isGlobal) {
                 symbolTerm.setAddressGp();
@@ -139,6 +142,7 @@ public class Visitor {
             ArrayList<ArrayList<Integer>> length2Value = ((NonLeafNode) node.getChild(index)).get2DValue(currentTable);
             SymbolTerm symbolTerm = new SymbolTerm(name, 2, length1D, length2D, length2Value);
             symbolTerm.setLine(isGlobal ? -1 : node.getChild(0).getLine());
+            symbolTerm.setConst(true);
             symbolTerm.setSize(false);
             if (isGlobal) {
                 symbolTerm.setAddressGp();
@@ -303,13 +307,33 @@ public class Visitor {
         } else {
             String left = getMidCode(node.getChild(0));
             String right = getMidCode(node.getChild(2));
-            String result = codeManager.getTemp(currentTable);
             OpType op = node.getChild(1).getSymbol().equals("PLUS")? OpType.ADD : OpType.SUB;
+            if (isNum(left) && isNum(right)) {
+                int leftValue = Integer.parseInt(left);
+                int rightValue = Integer.parseInt(right);
+                if (op == OpType.ADD) {
+                    return String.valueOf(leftValue + rightValue);
+                } else {
+                    return String.valueOf(leftValue - rightValue);
+                }
+            } else if(isNum(left) && Integer.parseInt(left) == 0) {
+                if (op == OpType.ADD) {
+                    return right;
+                } else {
+                    String result = codeManager.getTemp(currentTable);
+                    codeManager.addMidCode(new MidCodeTerm(OpType.NEG, right, null, result, currentTable));
+                    return result;
+                }
+            } else if (isNum(right) && Integer.parseInt(right) == 0) {
+                return left;
+            }
+            String result = codeManager.getTemp(currentTable);
             codeManager.addMidCode(new MidCodeTerm(op, left, right, result, currentTable));
             return result;
         }
     }
 
+    //TODO 那neg改成0-sub
     public String dealMulExp(Node node) {
         assert node.getSymbol().equals("MulExp");
         if (node.getSons().size() == 1) {
@@ -317,8 +341,49 @@ public class Visitor {
         } else {
             String left = getMidCode(node.getChild(0));
             String right = getMidCode(node.getChild(2));
+            OpType op = node.getChild(1).getSymbol().equals("MULT") ? OpType.MUL : (node.getChild(1).getSymbol().equals("DIV") ? OpType.DIV : OpType.MOD);
+            if (isNum(left) && isNum(right)) {
+                int leftValue = Integer.parseInt(left);
+                int rightValue = Integer.parseInt(right);
+                int resultValue = 0;
+                switch (op) {
+                    case MUL:
+                        resultValue = leftValue * rightValue;
+                        break;
+                    case DIV:
+                        resultValue = leftValue / rightValue;
+                        break;
+                    case MOD:
+                        resultValue = leftValue % rightValue;
+                        break;
+                }
+                return String.valueOf(resultValue);
+            } else if (op.equals(OpType.MUL) && isNum(left) && (Integer.parseInt(left) == 1 || Integer.parseInt(left) == -1)) {
+                if (Integer.parseInt(left) == 1) {
+                    return right;
+                } else {
+                    String result = codeManager.getTemp(currentTable);
+                    codeManager.addMidCode(new MidCodeTerm(OpType.NEG, right, null, result, currentTable));
+                    return result;
+                }
+            } else if (op != OpType.MOD && isNum(right) && (Integer.parseInt(right) == 1 || Integer.parseInt(right) == -1)) {
+                if (Integer.parseInt(right) == 1) {
+                    return left;
+                } else {
+                    String result = codeManager.getTemp(currentTable);
+                    codeManager.addMidCode(new MidCodeTerm(OpType.NEG, left, null, result, currentTable));
+                    return result;
+                }
+            } else if (op.equals(OpType.MOD) && isNum(right) && (Integer.parseInt(right) == 1 || Integer.parseInt(right) == -1)) {
+                return "0";
+            } else if (op.equals(OpType.MUL) && isNum(left) && Integer.parseInt(left) == 0) {
+                return "0";
+            } else if (op.equals(OpType.MUL) && isNum(right) && Integer.parseInt(right) == 0) {
+                return "0";
+            } else if ((op.equals(OpType.DIV) || op.equals(OpType.MOD)) && isNum(left) && Integer.parseInt(left) == 0) {
+                return "0";
+            }
             String result = codeManager.getTemp(currentTable);
-            OpType op = node.getChild(1).getSymbol().equals("MULT")? OpType.MUL : (node.getChild(1).getSymbol().equals("DIV")? OpType.DIV : OpType.MOD);
             codeManager.addMidCode(new MidCodeTerm(op, left, right, result, currentTable));
             return result;
         }
@@ -350,9 +415,20 @@ public class Visitor {
             String temp = codeManager.getTemp(currentTable);
             String result = dealUnaryExp(node.getChild(1), false);
             if (op.equals("MINU")) {
+                if (isNum(result)) {
+                    return String.valueOf(-Integer.parseInt(result));
+                }
                 codeManager.addMidCode(new MidCodeTerm(OpType.NEG, result, null, temp, currentTable));
                 result = temp;
             } else if (op.equals("NOT")) {
+                if (isNum(result)) {
+                    int num = Integer.parseInt(result);
+                    if (num == 0) {
+                        return "1";
+                    } else {
+                        return "0";
+                    }
+                }
                 codeManager.addMidCode(new MidCodeTerm(OpType.NOT, result, null, temp, currentTable));
                 result = temp;
             } else {
@@ -402,6 +478,10 @@ public class Visitor {
             int dim = currentTable.getDim(name);
             if (node.getSons().size() == 1) {
                 if (dim == 0) {
+                    if (currentTable.visitIsConst(name)) {
+                        int value = currentTable.getVisitValue(name);
+                        return String.valueOf(value);
+                    }
                     return identifier;
                 } else {
                     String temp = codeManager.getTemp(currentTable);
@@ -411,6 +491,10 @@ public class Visitor {
             } else if (node.getSons().size() == 4) {
                 if (dim == 1) {
                     String index = getMidCode(node.getChild(2));
+                    if (isNum(index) && currentTable.visitIsConst(name)) {
+                        int value = currentTable.getVisit1DValue(name, Integer.parseInt(index));
+                        return String.valueOf(value);
+                    }
                     String temp = codeManager.getTemp(currentTable);
                     codeManager.addMidCode(new MidCodeTerm(OpType.LOAD_ARRAY_1D, identifier, index, temp, currentTable));
                     return temp;
@@ -423,6 +507,10 @@ public class Visitor {
             } else {
                 String index1 = getMidCode(node.getChild(2));
                 String index2 = getMidCode(node.getChild(5));
+                if (isNum(index1) && isNum(index2) && currentTable.visitIsConst(name)) {
+                    int value = currentTable.getVisit2DValue(name, Integer.parseInt(index1), Integer.parseInt(index2));
+                    return String.valueOf(value);
+                }
                 String temp = codeManager.getTemp(currentTable);
                 codeManager.addMidCode(new MidCodeTerm(OpType.LOAD_ARRAY_2D, identifier, index1, index2, temp, currentTable));
                 return temp;
@@ -553,12 +641,14 @@ public class Visitor {
             SymbolTerm symbolTerm = new SymbolTerm(name, dim, 0);
             symbolTerm.setLine(line);
             symbolTerm.setSize(true);
+            symbolTerm.setParam();
             currentTable.addTerm(symbolTerm);
         } else if (node.getSons().size() == 4) {
             dim = 1;
             SymbolTerm symbolTerm = new SymbolTerm(name, dim, 0);
             symbolTerm.setLine(line);
             symbolTerm.setSize(true);
+            symbolTerm.setParam();
             currentTable.addTerm(symbolTerm);
         } else  {
             dim = 2;
@@ -566,6 +656,7 @@ public class Visitor {
             SymbolTerm symbolTerm = new SymbolTerm(name, dim, 0);
             symbolTerm.setLine(line);
             symbolTerm.setSize(true);
+            symbolTerm.setParam();
             symbolTerm.setLength2(length);
             currentTable.addTerm(symbolTerm);
         }
@@ -602,6 +693,35 @@ public class Visitor {
         String  temp = getMidCode(node.getChild(0));
         String op = node.getChild(1).getWord();
         String addExp = getMidCode(node.getChild(2));
+        if (isNum(temp) && isNum(addExp)) {
+            int a = Integer.parseInt(temp);
+            int b = Integer.parseInt(addExp);
+            if (op.equals("<")) {
+                if (a < b) {
+                    return "1";
+                } else {
+                    return "0";
+                }
+            } else if (op.equals("<=")) {
+                if (a <= b) {
+                    return "1";
+                } else {
+                    return "0";
+                }
+            } else if (op.equals(">")) {
+                if (a > b) {
+                    return "1";
+                } else {
+                    return "0";
+                }
+            } else if (op.equals(">=")) {
+                if (a >= b) {
+                    return "1";
+                } else {
+                    return "0";
+                }
+            }
+        }
         String result = codeManager.getTemp(currentTable);
         if (op.equals(">")) {
             codeManager.addMidCode(new MidCodeTerm(OpType.GT, temp, addExp, result, currentTable));
@@ -622,6 +742,23 @@ public class Visitor {
         String  temp = getMidCode(node.getChild(0));
         String op = node.getChild(1).getWord();
         String relExp = getMidCode(node.getChild(2));
+        if (isNum(temp) && isNum(relExp)) {
+            int a = Integer.parseInt(temp);
+            int b = Integer.parseInt(relExp);
+            if (op.equals("==")) {
+                if (a == b) {
+                    return "1";
+                } else {
+                    return "0";
+                }
+            } else if (op.equals("!=")) {
+                if (a != b) {
+                    return "1";
+                } else {
+                    return "0";
+                }
+            }
+        }
         String result = codeManager.getTemp(currentTable);
         if (op.equals("==")) {
             codeManager.addMidCode(new MidCodeTerm(OpType.EQ, temp, relExp, result, currentTable));
@@ -631,13 +768,24 @@ public class Visitor {
         return result;
     }
 
-    public void dealLandExp(Node node, boolean isFinal, String label) {
+    public void dealLandExp(Node node, boolean isFinal, String label, String OptLabel) {
         ArrayList<Node> eqExp = ((NonLeafNode) node).getEqExp();
         if (isFinal) {
             //判断是否跳到最后面
-            for (Node temp : eqExp) {
-                String result = dealEqExp(temp);
-                codeManager.addMidCode(new MidCodeTerm(OpType.BEQZ, result, null, label, currentTable));
+            if (OptLabel == null) {
+                for (Node temp : eqExp) {
+                    String result = dealEqExp(temp);
+                    codeManager.addMidCode(new MidCodeTerm(OpType.BEQZ, result, null, label, currentTable));
+                }
+            } else {
+                for (int i = 0; i < eqExp.size(); i++) {
+                    String result = dealEqExp(eqExp.get(i));
+                    if (i != eqExp.size() - 1) {
+                        codeManager.addMidCode(new MidCodeTerm(OpType.BEQZ, result, null, label, currentTable));
+                    } else {
+                        codeManager.addMidCode(new MidCodeTerm(OpType.BNEZ, result, null, OptLabel, currentTable));
+                    }
+                }
             }
         } else {
             //这是传进来的label是正确时进入的块
@@ -652,24 +800,31 @@ public class Visitor {
         }
     }
 
-    public String dealLorExp(Node node, String rightLabel, String wrongLabel) {
+    public String dealLorExp(Node node, String rightLabel, String wrongLabel, boolean isOpt) {
         ArrayList<Node> landExp = ((NonLeafNode) node).getLandExp();
-        for (int i = 0; i < landExp.size() - 1; i++) {
-            dealLandExp(landExp.get(i), false, rightLabel);
+        if (!isOpt) {
+            for (int i = 0; i < landExp.size() - 1; i++) {
+                dealLandExp(landExp.get(i), false, rightLabel, null);
+            }
+            dealLandExp(landExp.get(landExp.size() - 1), true, wrongLabel, null);
+        } else {
+            for (int i = 0; i < landExp.size() - 1; i++) {
+                dealLandExp(landExp.get(i), false, rightLabel, null);
+            }
+            dealLandExp(landExp.get(landExp.size() - 1), true, wrongLabel, rightLabel);
         }
-        dealLandExp(landExp.get(landExp.size() - 1), true, wrongLabel);
         return "114514";
     }
 
-    public String dealCond(Node node, String rightLabel, String wrongLabel) {
-        dealLorExp(node.getChild(0), rightLabel, wrongLabel);
+    public String dealCond(Node node, String rightLabel, String wrongLabel, boolean isBottom) {
+        dealLorExp(node.getChild(0), rightLabel, wrongLabel, isBottom);
         return "114514";
     }
 
     public void dealIf(Node node) {
         String label1 = codeManager.getLabel();
         String label2 = codeManager.getLabel();
-        dealCond(node.getChild(2), label1, label2);
+        dealCond(node.getChild(2), label1, label2, false);
         codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label1, currentTable));
         getMidCode(node.getChild(4));
         if (node.getSons().size() > 5) {
@@ -690,12 +845,21 @@ public class Visitor {
         node.setBeginLabel(label1);
         node.setRightLabel(label2);
         node.setWrongLabel(label3);
-        codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label1, currentTable));
-        dealCond(node.getChild(2), label2, label3);
-        codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label2, currentTable));
-        getMidCode(node.getChild(4));
-        codeManager.addMidCode(new MidCodeTerm(OpType.GOTO, null, null, label1, currentTable));
-        codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label3, currentTable));
+        if (!Optimizer.getInstance().getOptimizer()) {
+            codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label1, currentTable));
+            dealCond(node.getChild(2), label2, label3, false);
+            codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label2, currentTable));
+            getMidCode(node.getChild(4));
+            codeManager.addMidCode(new MidCodeTerm(OpType.GOTO, null, null, label1, currentTable));
+            codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label3, currentTable));
+        } else {
+            codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label1, currentTable));
+            dealCond(node.getChild(2), label2, label3, false);
+            codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label2, currentTable));
+            getMidCode(node.getChild(4));
+            dealCond(node.getChild(2), label2, label3, true);
+            codeManager.addMidCode(new MidCodeTerm(OpType.PUT_LABEL, null, null, label3, currentTable));
+        }
     }
 
     public void dealBreak(Node node) {
@@ -722,5 +886,9 @@ public class Visitor {
             temp = temp.getFather();
         }
         System.out.println("continue语句不在循环体内");
+    }
+
+    public boolean isNum(String str) {
+        return str.matches("[-+]*[0-9]+");
     }
 }
