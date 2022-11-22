@@ -328,28 +328,72 @@ public class SymbolTable {
             name = preName;
         }
         if (!isReal) {
+            assert this.father != null;
             SymbolTable now = this;
-            while (now != null) {
-                for (SymbolTerm symbolTerm : now.symbolTerms) {
-                    if (symbolTerm.getName().equals(name)) {
-                        return symbolTerm;
-                    }
-                }
+            //找到了func符号表
+            while (now.father.father != null) {
                 now = now.father;
             }
-            return null;
+            return now.getRealSymbolTerm(name);
         } else {
+
             SymbolTable now = this;
-            while (now != null) {
+            if (now.father == null) {
                 for (SymbolTerm symbolTerm : now.symbolTerms) {
                     if (symbolTerm.getName().equals(name) && symbolTerm.getLine() == line) {
                         return symbolTerm;
                     }
                 }
+            }
+            assert now.father != null;
+            while (now.father.father != null) {
                 now = now.father;
+            }
+            if (now.getRealSymbolTerm(name, line) != null) {
+                return now.getRealSymbolTerm(name, line);
+            }
+            //全局变量了
+            now = now.father;
+            assert line == -1;
+            for (SymbolTerm symbolTerm : now.symbolTerms) {
+                if (symbolTerm.getName().equals(name) && symbolTerm.getLine() == -1) {
+                    return symbolTerm;
+                }
             }
             return null;
         }
+    }
+
+    public SymbolTerm getRealSymbolTerm(String name) {
+        SymbolTable now = this;
+        for (SymbolTerm symbolTerm : now.symbolTerms) {
+            if (symbolTerm.getName().equals(name)) {
+                return symbolTerm;
+            }
+        }
+        for (SymbolTable son : now.sons) {
+            SymbolTerm symbolTerm = son.getRealSymbolTerm(name);
+            if (symbolTerm != null) {
+                return symbolTerm;
+            }
+        }
+        return null;
+    }
+
+    public SymbolTerm getRealSymbolTerm(String name, int line) {
+        SymbolTable now = this;
+        for (SymbolTerm symbolTerm : now.symbolTerms) {
+            if (symbolTerm.getName().equals(name) && symbolTerm.getLine() == line) {
+                return symbolTerm;
+            }
+        }
+        for (SymbolTable son : now.sons) {
+            SymbolTerm symbolTerm = son.getRealSymbolTerm(name, line);
+            if (symbolTerm != null) {
+                return symbolTerm;
+            }
+        }
+        return null;
     }
 
     public boolean isNum(String str) {
@@ -369,30 +413,73 @@ public class SymbolTable {
         } else {
             name = preName;
         }
-        if (!isReal) {
-            SymbolTable now = this;
-            while (now != null) {
-                for (SymbolTerm symbolTerm : now.symbolTerms) {
-                    if (symbolTerm.getName().equals(name)) {
-                        return symbolTerm.getOffset_sp() + stackSize;
-                    }
-                }
-                now = now.father;
-            }
-            return -1;
-        } else {
-            SymbolTable now = this;
-            while (now != null) {
-                for (SymbolTerm symbolTerm : now.symbolTerms) {
-                    if (symbolTerm.getName().equals(name)) {
-                        if (symbolTerm.getLine() == line) {
-                            return symbolTerm.getOffset_sp() + stackSize;
-                        }
-                    }
-                }
-                now = now.father;
-            }
+        SymbolTerm symbolTerm = getSymbolTerm(preName);
+        if (symbolTerm == null) {
             return -1;
         }
+        return symbolTerm.getOffset_sp() + stackSize;
+    }
+
+    public boolean visitIsConst(String name) {
+        SymbolTable now = this;
+        while (now != null) {
+            for (SymbolTerm son : now.symbolTerms) {
+                if (son.getName().equals(name)) {
+                    return son.getIsConst();
+                }
+            }
+            now = now.father;
+        }
+        return false;
+    }
+
+    public int getVisitValue(String name) {
+        SymbolTable now = this;
+        while (now != null) {
+            for (SymbolTerm son : now.symbolTerms) {
+                if (son.getName().equals(name)) {
+                    return son.getValue();
+                }
+            }
+            now = now.father;
+        }
+        return 114514;
+    }
+
+    public int getVisit1DValue(String name, int i) {
+        SymbolTable now = this;
+        while (now != null) {
+            for (SymbolTerm son : now.symbolTerms) {
+                if (son.getName().equals(name)) {
+                    return son.getLength1Value().get(i);
+                }
+            }
+            now = now.father;
+        }
+        return 114514;
+    }
+
+    public int getVisit2DValue(String name, int i, int j) {
+        SymbolTable now = this;
+        while (now != null) {
+            for (SymbolTerm son : now.symbolTerms) {
+                if (son.getName().equals(name)) {
+                    return son.getLength2Value().get(i).get(j);
+                }
+            }
+            now = now.father;
+        }
+        return 114514;
+    }
+
+    public ArrayList<SymbolTerm> getParaList(String func) {
+        SymbolTable temp = ErrorAnalysis.getInstance().getFunc2Symbol(func);
+        ArrayList<SymbolTerm> ans = new ArrayList<>();
+        for (SymbolTerm symbolTerm : temp.symbolTerms) {
+            if (symbolTerm.getIsParam()) {
+                ans.add(symbolTerm);
+            }
+        }
+        return ans;
     }
 }

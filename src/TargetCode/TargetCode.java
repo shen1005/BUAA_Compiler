@@ -62,4 +62,8 @@ public class TargetCode {
         }
         return code;
     }
+
+    public void setMidCodeTerms(ArrayList<MidCodeTerm> midCodeTerms) {
+        this.midCodeTerms = midCodeTerms;
+    }
 }
